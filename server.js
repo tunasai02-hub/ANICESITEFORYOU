@@ -151,7 +151,7 @@ img {
 
 <div class="content">
 
-<h1>nası inandın bilmiyorum:)</h1>
+<h1>nası inandın gardasım laa :d</h1>
 
 <img
 src="https://i.pinimg.com/736x/d1/d6/89/d1d689d280015331b1a3954e784459b8.jpg"
